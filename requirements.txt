@@ -1,0 +1,6 @@
+Flask==3.0.0
+python-dotenv==1.0.1
+SpeechRecognition==3.10.4
+standard-aifc==3.13.0
+waitress==2.1.2
+pytest==8.3.4
