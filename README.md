@@ -1,22 +1,94 @@
-# FluencyGPT (Backend)
+# FluencyGPT Backend
 
-Flask-based backend for **FluencyGPT: Automatic Stuttering Correction**.
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.x-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![Pytest](https://img.shields.io/badge/Tested%20with-pytest-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-Demo note (offline + stable):
-This repo is structured so the rewrite step can be swapped to an LLM-backed implementation,
-but the default is a deterministic, rule-based rewriter to keep the project fully offline and demo-safe.
+Production-ready Flask backend for FluencyGPT, focused on automatic stuttering correction with a reliable offline-first architecture.
 
-## Features
-- `/health` server status
-- `/asr` audio upload → ASR transcript (SpeechRecognition)
-- `/detect` text → detected disfluency segments (regex NLP)
-- `/rewrite` text → fluent rewrite (rule-based, offline)
-- `/pipeline` audio upload OR text → detection + rewrite
-- `/voice` audio upload → ASR → detection + rewrite
+The system supports:
+- deterministic, rule-based disfluency processing for stable offline demos
+- optional OpenRouter LLM rewriting for stronger fluency polishing
+- optional ASR pipeline via SpeechRecognition when online mode is enabled
 
-## Local setup (Windows)
+## UI Preview
 
-### 1) Create venv + install deps
+![FluencyGPT UI](docs/images/fluencygpt-ui.png)
+
+## What This Project Does
+
+FluencyGPT processes user input in two modes:
+1. Text mode: disfluency detection followed by fluent rewrite
+2. Voice mode: audio transcription, then detection and rewrite
+
+Target disfluency patterns include:
+- filler words like um, uh, er
+- immediate repetitions like I I want
+- broken starts like t t to and b-b-because
+- prolonged sounds like sssorry
+
+## Core Features
+
+- Health endpoint for uptime checks
+- Disfluency detector with span-level structured output
+- Fluency rewriter with rule-based baseline and LLM enhancement path
+- Unified pipeline endpoint that accepts either JSON text or multipart audio
+- Voice endpoint for end-to-end ASR plus fluency rewrite
+- Offline-safe defaults for predictable demos
+
+## Architecture Overview
+
+```text
+Client (UI / API caller)
+    |
+    +--> /detect  ------> Rule-based Disfluency Detector
+    |
+    +--> /rewrite -----> Rule-based Rewriter ----+--> Response
+    |                                            |
+    |                                            +--> OpenRouter LLM (optional)
+    |
+    +--> /pipeline or /voice
+             |
+             +--> ASR Service (optional online)
+             +--> Detector
+             +--> Rewriter (LLM with rule fallback)
+```
+
+## Tech Stack
+
+- Python 3.10+
+- Flask backend
+- SpeechRecognition for ASR
+- python-dotenv for configuration
+- Waitress option for production-style serving
+- pytest for tests
+
+## Project Structure
+
+```text
+src/fluencygpt/
+  app.py                 # Flask app factory
+  __main__.py            # Entrypoint: python -m fluencygpt
+  config.py              # Environment-backed settings
+  routes/
+    api.py               # /health, /asr, /detect, /rewrite, /pipeline, /voice
+    voice.py             # /process-audio
+  services/
+    asr_service.py       # Audio decoding, conversion, transcription
+    disfluency_service.py# Rule-based detection engine
+    rewrite_service.py   # Rule-based + OpenRouter rewrite path
+  utils/
+    http.py              # JSON error helpers
+    text.py              # Text normalization helpers
+tests/
+  test_*.py              # Endpoint and service behavior tests
+```
+
+## Quick Start (Windows)
+
+### 1. Create virtual environment and install dependencies
+
 ```powershell
 cd c:\Projects\FluencyGPT
 python -m venv .venv
@@ -24,50 +96,61 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 2) Configure environment (optional)
-No API keys are required for offline rule-based rewriting.
+### 2. Configure environment
 
-To enable LLM rewriting via OpenRouter, set in `.env`:
+No API keys are needed for offline rule-based mode.
+
+Optional .env values:
+
 ```env
+HOST=127.0.0.1
+PORT=5000
+MAX_UPLOAD_BYTES=26214400
+ENABLE_ONLINE_ASR=0
 OPENROUTER_API_KEY=your-key
-# Optional: force a specific model ID
 OPENROUTER_MODEL=openai/gpt-4o-mini
 ```
 
-### 3) Run the server
-Development:
+### 3. Run server
+
 ```powershell
 ./run_dev.ps1
 ```
 
 Alternative:
+
 ```powershell
 python -m fluencygpt
 ```
 
-Production-ish (Windows-friendly):
+Production-style serving:
+
 ```powershell
 python -m fluencygpt --serve waitress
 ```
 
-## ASR notes
-This backend uses the `SpeechRecognition` library.
-- It works best with **WAV PCM** input.
-- If you upload MP3/M4A, you typically need conversion (often via FFmpeg). This project keeps dependencies minimal and expects WAV for best reliability.
+## API Reference
 
-## API quick examples
+| Method | Endpoint | Purpose | Default Mode |
+|---|---|---|---|
+| GET | /health | Service health check | Offline |
+| POST | /asr | Audio to transcript | Disabled unless ENABLE_ONLINE_ASR=1 |
+| POST | /detect | Detect disfluency spans from text | Offline |
+| POST | /rewrite | Fluency rewrite from text | Offline baseline, LLM optional |
+| POST | /pipeline | Full pipeline from text or audio | Offline for text path |
+| POST | /voice | Audio to fluent text pipeline | Disabled unless ENABLE_ONLINE_ASR=1 |
+| POST | /process-audio | Voice-focused end-to-end route | Disabled unless ENABLE_ONLINE_ASR=1 |
 
-Notes:
-- For a fully offline demo, use JSON text with `/detect`, `/rewrite`, and `/pipeline`.
-- `/asr` is disabled by default; it can be enabled with `ENABLE_ONLINE_ASR=1` (uses online Google recognizer).
-- `/voice` is also disabled by default and requires `ENABLE_ONLINE_ASR=1`.
+## API Usage Examples
 
 ### Health
+
 ```bash
 curl http://127.0.0.1:5000/health
 ```
 
 ### Detect
+
 ```bash
 curl -X POST http://127.0.0.1:5000/detect \
   -H "Content-Type: application/json" \
@@ -75,7 +158,7 @@ curl -X POST http://127.0.0.1:5000/detect \
 ```
 
 ### Rewrite
-PowerShell:
+
 ```powershell
 Invoke-WebRequest `
   -Uri http://127.0.0.1:5000/rewrite `
@@ -84,20 +167,8 @@ Invoke-WebRequest `
   -Body '{ "text": "I I I want to um go to the store" }'
 ```
 
-Response shape:
-- `original`: input text
-- `fluent`: rewritten text
-- `engine`: `openrouter` or `rule-based`
-- `llm_used`: `true` when OpenRouter produced the final output
+### Pipeline (offline text path)
 
-### ASR
-```bash
-curl -X POST http://127.0.0.1:5000/asr \
-  -F "audio=@sample.wav"
-```
-
-### Pipeline
-Offline (text-only) PowerShell:
 ```powershell
 Invoke-WebRequest `
   -Uri http://127.0.0.1:5000/pipeline `
@@ -106,30 +177,42 @@ Invoke-WebRequest `
   -Body '{ "text": "I I I want t t to go home" }'
 ```
 
-Audio pipeline (requires online ASR):
+### Voice (online ASR required)
+
 ```powershell
 $env:ENABLE_ONLINE_ASR = "1"
-# PowerShell 5.1: use curl.exe for multipart form upload
-curl.exe -X POST http://127.0.0.1:5000/pipeline -F "audio=@sample.wav"
-
-# PowerShell 7+: you can also use Invoke-RestMethod -Form
-# Invoke-RestMethod -Uri http://127.0.0.1:5000/pipeline -Method POST -Form @{ audio = Get-Item .\sample.wav }
-```
-
-### Voice
-WAV (preferred):
-```powershell
-$env:ENABLE_ONLINE_ASR = "1"
-# PowerShell 5.1: use curl.exe for multipart form upload
 curl.exe -X POST http://127.0.0.1:5000/voice -F "audio=@sample.wav"
-
-# PowerShell 7+: you can also use Invoke-RestMethod -Form
-# Invoke-RestMethod -Uri http://127.0.0.1:5000/voice -Method POST -Form @{ audio = Get-Item .\sample.wav }
 ```
 
-MP3 (allowed if ffmpeg is installed for conversion):
+## ASR and Audio Notes
+
+- ASR uses SpeechRecognition with Google recognizer when enabled
+- WAV PCM is the most reliable input format
+- WebM, OGG, MP3, and M4A are supported through ffmpeg conversion if ffmpeg is installed
+- Without ENABLE_ONLINE_ASR=1, ASR endpoints are intentionally restricted for offline safety
+
+## Security and Secret Management
+
+- Keep secrets in local .env only
+- Never commit real API keys
+- .env is ignored through .gitignore
+- Use .env.example as a safe template for collaborators
+
+## Testing
+
+Run all tests:
+
 ```powershell
-$env:ENABLE_ONLINE_ASR = "1"
-curl.exe -X POST http://127.0.0.1:5000/voice -F "audio=@sample.mp3"
+./run_tests.ps1
 ```
+
+Or directly:
+
+```powershell
+python -m pytest -q
+```
+
+## License
+
+MIT
 
