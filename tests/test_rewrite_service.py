@@ -26,3 +26,35 @@ def test_rewrite_normalizes_prolongations():
 def test_rewrite_removes_fillers_and_normalizes_words():
     rewriter = FluencyRewriter()
     assert rewriter.rewrite("I um um really reallly want it") == "I really want it"
+
+
+def test_rewrite_uses_llm_when_api_key_present(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-key")
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
+
+    def _fake_llm(*, text, api_key, model):  # noqa: ANN001
+        _ = text, api_key, model
+        return "I want to go home"
+
+    monkeypatch.setattr("fluencygpt.services.rewrite_service._openrouter_llm_rewrite", _fake_llm)
+
+    out = rewrite_text("I I I want to um go home")
+    assert out["llm_used"] is True
+    assert out["engine"] == "openrouter"
+    assert out["fluent"] == "I want to go home"
+
+
+def test_rewrite_fallback_reports_reason(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "dummy-key")
+    monkeypatch.setenv("OPENROUTER_MODEL", "not-a-real-model")
+
+    def _fake_llm_fail(*, text, api_key, model):  # noqa: ANN001
+        _ = text, api_key, model
+        raise RuntimeError("OpenRouter HTTP error: 404")
+
+    monkeypatch.setattr("fluencygpt.services.rewrite_service._openrouter_llm_rewrite", _fake_llm_fail)
+
+    out = rewrite_text("I I I want to um go home")
+    assert out["llm_used"] is False
+    assert out["engine"] == "rule-based"
+    assert "OpenRouter HTTP error" in out["llm_reason"]

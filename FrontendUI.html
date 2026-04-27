@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FluencyGPT</title>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Baloo 2', cursive;
+      background: linear-gradient(135deg, #fcefee, #e8f6ff);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .wrapper {
+      background: #ffffff;
+      border-radius: 24px;
+      width: 90%;
+      max-width: 900px;
+      padding: 30px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .title {
+      text-align: center;
+      font-size: 2.6rem;
+      font-weight: 700;
+      color: #ff7a7a;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 40px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+    }
+
+    .card {
+      background: #f9fbff;
+      border-radius: 24px;
+      padding: 30px 25px;
+      text-align: center;
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.06);
+    }
+
+    .icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      color: #7b6cff;
+      margin-bottom: 18px;
+      font-weight: 700;
+    }
+
+    textarea {
+      width: 100%;
+      height: 110px;
+      border-radius: 16px;
+      border: 2px dashed #cfd8ff;
+      padding: 14px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      resize: none;
+      outline: none;
+      box-sizing: border-box;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      margin-top: 12px;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #7b6cff, #9b92ff);
+      color: #fff;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 999px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .mic {
+      display: inline-block;
+      margin-left: 12px;
+      font-size: 1.4rem;
+      cursor: pointer;
+      transition: transform 0.15s;
+      user-select: none;
+    }
+
+    .mic:hover {
+      transform: scale(1.15);
+    }
+
+    .mic.recording {
+      animation: pulse 0.8s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from {
+        transform: scale(1);
+      }
+
+      to {
+        transform: scale(1.3);
+      }
+    }
+
+    .magic-text {
+      color: #444;
+      font-size: 1.05rem;
+      font-weight: 500;
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+
+    .sparkle {
+      font-size: 2rem;
+      margin-top: 30px;
+    }
+
+    .output {
+      background: #eafff1;
+      border-radius: 16px;
+      padding: 20px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #2e7d32;
+      min-height: 110px;
+      word-wrap: break-word;
+    }
+
+    .output.error {
+      color: #c62828;
+      background: #ffeaea;
+    }
+
+    .status-msg {
+      text-align: center;
+      margin-top: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #7b6cff;
+      min-height: 1.2em;
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #777;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <div class="title">FluencyGPT</div>
+    <div class="subtitle">Speak happily ✨ We'll make your words smooth and clear!</div>
+    <div class="cards">
+      <div class="card">
+        <div class="icon">🎙️</div>
+        <h3>Speak or Type</h3>
+        <textarea id="inputText" placeholder="Type your text here...">i i i want to talk</textarea>
+        <div class="input-row">
+          <button class="btn" id="fixBtn" onclick="fixSpeech()">Fix My Speech</button>
+          <span class="mic" id="micBtn" onclick="toggleMic()" title="Click to record audio">🎤</span>
+        </div>
+        <div class="status-msg" id="statusMsg"></div>
+      </div>
+      <div class="card">
+        <div class="icon">🧠</div>
+        <h3>Fluency Magic</h3>
+        <div class="magic-text">The smart brain removes repeats<br>and broken words.</div>
+        <div class="sparkle">✨</div>
+      </div>
+      <div class="card">
+        <div class="icon">📖</div>
+        <h3>Clean Sentence</h3>
+        <div class="output" id="outputText">Your clean text will appear here 🌟</div>
+        <span class="mic" onclick="speakOutput()" title="Read aloud">🔊</span>
+      </div>
+    </div>
+    <div class="footer">Made friendly · FluencyGPT</div>
+  </div>
+  <script>
+    /* ──────────────────────────────────────────────
+       API base – adjust if backend runs elsewhere
+       ────────────────────────────────────────────── */
+    const API_BASE = '';  // same origin; change to e.g. 'http://127.0.0.1:5000' if needed
+
+    /* ──────────────────────────────────────────────
+       DOM helpers
+       ────────────────────────────────────────────── */
+    const $input = document.getElementById('inputText');
+    const $output = document.getElementById('outputText');
+    const $fixBtn = document.getElementById('fixBtn');
+    const $micBtn = document.getElementById('micBtn');
+    const $status = document.getElementById('statusMsg');
+
+    function showOutput(text, isError = false) {
+      $output.innerText = text;
+      $output.classList.toggle('error', isError);
+    }
+
+    function setStatus(msg, autoClear = false) {
+      $status.innerText = msg;
+      if (autoClear) setTimeout(() => { if ($status.innerText === msg) $status.innerText = ''; }, 3000);
+    }
+
+    /* ──────────────────────────────────────────────
+       Feature 1: Text Correction → POST /rewrite
+       ────────────────────────────────────────────── */
+    async function fixSpeech() {
+      const text = $input.value.trim();
+      if (!text) { showOutput('Please type or speak first 😊', true); return; }
+
+      $fixBtn.disabled = true;
+      setStatus('Processing…');
+      showOutput('Thinking… ✨');
+
+      try {
+        const res = await fetch(API_BASE + '/rewrite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `Server returned ${res.status}`);
+        }
+
+        const data = await res.json();
+        showOutput(data.fluent || data.clean_text || text);
+        setStatus('Done ✅', true);
+      } catch (err) {
+        showOutput('Could not reach the server — is the backend running? 😢', true);
+        setStatus('');
+        console.error('fixSpeech error:', err);
+      } finally {
+        $fixBtn.disabled = false;
+      }
+    }
+
+    /* ──────────────────────────────────────────────
+       Feature 2: Voice Mode → MediaRecorder + POST /process-audio
+       ────────────────────────────────────────────── */
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
+
+    async function toggleMic() {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        await startRecording();
+      }
+    }
+
+    async function startRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Prefer WAV-compatible format; fall back to whatever the browser supports
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : '';
+
+        mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          // Stop all microphone tracks to release the device
+          stream.getTracks().forEach(t => t.stop());
+          await sendAudioToBackend();
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        $micBtn.classList.add('recording');
+        $fixBtn.disabled = true;
+        setStatus('🔴 Recording… click 🎤 again to stop');
+      } catch (err) {
+        showOutput('Microphone access denied — please allow mic permissions 🎤', true);
+        setStatus('');
+        console.error('Mic error:', err);
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      isRecording = false;
+      $micBtn.classList.remove('recording');
+      setStatus('Processing audio…');
+      $micBtn.style.pointerEvents = 'none';
+      $micBtn.style.opacity = '0.5';
+    }
+
+    async function sendAudioToBackend() {
+      if (audioChunks.length === 0) {
+        showOutput('No audio recorded — try again 🎤', true);
+        setStatus('');
+        return;
+      }
+
+      const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+      const formData = new FormData();
+      formData.append('audio', blob, 'recording.webm');
+
+      showOutput('Transcribing and cleaning… ✨');
+
+      try {
+        const res = await fetch(API_BASE + '/process-audio', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || `Server returned ${res.status}`);
+        }
+
+        // Display original transcript in input box, clean text in output
+        if (data.original_text) {
+          $input.value = data.original_text;
+        }
+        showOutput(data.clean_text || data.original_text || 'No speech detected');
+        setStatus('Done ✅', true);
+      } catch (err) {
+        const message = (err && err.message) ? err.message : 'Audio processing failed — is the backend running?';
+        showOutput(message, true);
+        setStatus('');
+        console.error('process-audio error:', err);
+      } finally {
+        $micBtn.style.pointerEvents = '';
+        $micBtn.style.opacity = '';
+        $fixBtn.disabled = false;
+      }
+    }
+
+    /* ──────────────────────────────────────────────
+       Read aloud (Text-to-Speech, browser native)
+       ────────────────────────────────────────────── */
+    function speakOutput() {
+      const text = $output.innerText;
+      if (!text) return;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    }
+  </script>
+</body>
+
+</html>

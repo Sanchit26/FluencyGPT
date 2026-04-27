@@ -25,10 +25,22 @@ pip install -r requirements.txt
 ```
 
 ### 2) Configure environment (optional)
-No API keys are required.
+No API keys are required for offline rule-based rewriting.
+
+To enable LLM rewriting via OpenRouter, set in `.env`:
+```env
+OPENROUTER_API_KEY=your-key
+# Optional: force a specific model ID
+OPENROUTER_MODEL=openai/gpt-4o-mini
+```
 
 ### 3) Run the server
 Development:
+```powershell
+./run_dev.ps1
+```
+
+Alternative:
 ```powershell
 python -m fluencygpt
 ```
@@ -75,6 +87,8 @@ Invoke-WebRequest `
 Response shape:
 - `original`: input text
 - `fluent`: rewritten text
+- `engine`: `openrouter` or `rule-based`
+- `llm_used`: `true` when OpenRouter produced the final output
 
 ### ASR
 ```bash

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any
 
 from fluencygpt.utils.text import normalize_whitespace
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -304,4 +307,5 @@ def detect_disfluencies(text: str, *, include_debug: bool = False) -> dict[str, 
             "hits": debug_hits,
         }
 
+    log.info("Disfluency detection: %d segments found — %s", len(segments), summary)
     return out

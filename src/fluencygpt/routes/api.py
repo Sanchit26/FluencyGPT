@@ -63,7 +63,8 @@ def rewrite():
 
     JSON: {"text": "...", "hints": {...} (optional) }
 
-    This implementation is fully offline and deterministic.
+    This endpoint performs a small deterministic cleanup, then uses OpenRouter (LLM)
+    for meaning-preserving fluency correction, with a rule-based fallback if the API fails.
     """
 
     payload = request.get_json(silent=True) or {}
@@ -117,13 +118,18 @@ def pipeline():
 
     detection = detect_disfluencies(transcript)
 
-    rewrite = rewrite_text(
-        text=transcript,
-        hints={
-            "detected": detection.get("segments"),
-            "summary": detection.get("summary"),
-        },
-    )
+    try:
+        rewrite = rewrite_text(
+            text=transcript,
+            hints={
+                "detected": detection.get("segments"),
+                "summary": detection.get("summary"),
+            },
+        )
+    except ValueError as exc:
+        return server_error(str(exc))
+    except Exception as exc:  # noqa: BLE001
+        return server_error(f"Rewrite failed: {exc}")
 
     return jsonify(
         {
@@ -169,13 +175,18 @@ def voice():
 
     fluent = ""
     if asr_text:
-        fluent = rewrite_text(
-            text=asr_text,
-            hints={
-                "detected": detected.get("segments"),
-                "summary": detected.get("summary"),
-            },
-        ).get("fluent", "")
+        try:
+            fluent = rewrite_text(
+                text=asr_text,
+                hints={
+                    "detected": detected.get("segments"),
+                    "summary": detected.get("summary"),
+                },
+            ).get("fluent", "")
+        except ValueError as exc:
+            return server_error(str(exc))
+        except Exception as exc:  # noqa: BLE001
+            return server_error(f"Rewrite failed: {exc}")
 
     return jsonify(
         {

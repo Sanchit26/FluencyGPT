@@ -11,6 +11,4 @@ if (Test-Path $venvPython) {
   $py = "python"
 }
 
-$env:PYTHONPATH = "${PSScriptRoot}\src"
-
 & $py -m pytest -q
